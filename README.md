@@ -1,38 +1,3 @@
-# Testing the Scheduler
-This lab is about implementing different schedulers. The scheduler will have to be selected at compile time using a `make` flag.
-
-## Compiling and Running
-### 1. To compile and run original Round Robin Scheduler
-```bash
-make clean
-make qemu
-```
-### 2. To compile and run Lottery Scheduler
-```bash
-make clean
-make LAB2=LOTTERY
-make qemu
-```
-### 3. To compile and run Stride Scheduler
-```bash
-make clean
-make LAB2=STRIDE
-make qemu
-```
-
-## Testing
-Once you have `xv6` running with desired scheduler, use the lab2 user program to test it. This program forks a number of child processes, assigns them tickets, lets them run for a set number of ticks and then prints the stats. 
-
-**Note: Maximum NUM_PROCESSES = 10**
-
-**Usage:** `lab2 [TICKS] [NUM_PROCESSES] [TICKET_1] [TICKET_2] ...`
-
-**Example** 
-```bash
-lab2 100 3 10 20 30
-```
-
-# Original Description
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
 Version 6 (v6).  xv6 loosely follows the structure and style of v6,
 but is implemented for a modern RISC-V multiprocessor using ANSI C.
