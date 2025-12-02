@@ -110,6 +110,7 @@ void            procdump(void);
 void            print_hello(int); // hello
 int             count_active_processes(void); // sysinfo
 void            proc_stats(void); // sched_statistics
+int             clone(void *); // clone
 
 // swtch.S
 void            swtch(struct context*, struct context*);

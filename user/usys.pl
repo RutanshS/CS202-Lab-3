@@ -46,3 +46,5 @@ entry("procinfo");
 entry("sched_statistics");
 # sched_tickets
 entry("sched_tickets");
+# clone
+entry("clone");

@@ -109,4 +109,5 @@ struct proc {
   int ticks;                   // Count of scheduling ticks
   int stride;                  // Stride for process
   int pass;                    // pass value for process
+  int thread_id;               // thread_id of the cloned thread
 };

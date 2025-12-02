@@ -161,7 +161,6 @@ sys_procinfo(void)
 uint64
 sys_sched_statistics(void)
 {
-  // ToDo: Add Logic to loop through processes and print statistics
   proc_stats();
   return 0;
 }
@@ -180,4 +179,13 @@ sys_sched_tickets(void)
   }
 
   return 0;
+}
+
+
+uint64
+sys_clone(void)
+{
+  uint64 stack;
+  argaddr(0, &stack);
+  return clone((void *)stack);
 }

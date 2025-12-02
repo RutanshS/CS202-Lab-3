@@ -117,7 +117,7 @@ allocpid()
 // and return with p->lock held.
 // If there are no free procs, or a memory allocation fails, return 0.
 static struct proc*
-allocproc(void)
+allocproc(int thread_flag)
 {
   struct proc *p;
 
@@ -147,12 +147,14 @@ found:
     return 0;
   }
 
-  // An empty user page table.
-  p->pagetable = proc_pagetable(p);
-  if(p->pagetable == 0){
-    freeproc(p);
-    release(&p->lock);
-    return 0;
+  if (!thread_flag) {
+    // An empty user page table.
+    p->pagetable = proc_pagetable(p);
+    if(p->pagetable == 0){
+      freeproc(p);
+      release(&p->lock);
+      return 0;
+    }
   }
 
   // Set up new context to start executing at forkret,
@@ -173,8 +175,15 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
+
+  if (p->thread_id > 0 && p->pagetable != 0) {
+    uint64 trapframe_va = TRAPFRAME - (p->thread_id * PGSIZE);
+    uvmunmap(p->pagetable, trapframe_va, 1, 0); 
+  } 
+  else if(p->pagetable) {
     proc_freepagetable(p->pagetable, p->sz);
+  }
+
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -183,9 +192,12 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
-  p->tickets = 0;
+  p->tickets = 0; 
   p->ticks = 0;
+  p->stride = 0; 
+  p->pass = 0;
   p->state = UNUSED;
+  p->thread_id = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -251,7 +263,7 @@ userinit(void)
 {
   struct proc *p;
 
-  p = allocproc();
+  p = allocproc(0);
   initproc = p;
   
   // allocate one user page and copy initcode's instructions
@@ -301,7 +313,7 @@ fork(void)
   struct proc *p = myproc();
 
   // Allocate process.
-  if((np = allocproc()) == 0){
+  if((np = allocproc(0)) == 0){
     return -1;
   }
 
@@ -320,6 +332,87 @@ fork(void)
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
+
+  // increment reference counts on open file descriptors.
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+  pid = np->pid;
+
+  release(&np->lock);
+
+  acquire(&wait_lock);
+  np->parent = p;
+  release(&wait_lock);
+
+  acquire(&np->lock);
+  np->state = RUNNABLE;
+  release(&np->lock);
+
+  return pid;
+}
+
+// Implment clone() syscall
+int
+clone(void *stack) {
+  int i, pid;
+  struct proc *np;
+  struct proc *p = myproc();
+
+  // Allocate process.
+  if((np = allocproc(1)) == 0){
+    return -1;
+  }
+
+  np->pagetable = p->pagetable;
+  np->sz = p->sz;
+  *np->trapframe = *p->trapframe;
+  np->trapframe->a0 = 0;
+  np->trapframe->sp = (uint64)stack;
+
+  int used_ids[21] = {0}; 
+  struct proc *pp;
+
+  used_ids[0] = 1;
+
+  for(pp = proc; pp < &proc[NPROC]; pp++){
+    if (pp->parent == p && pp->state != UNUSED && pp->pagetable == p->pagetable) {
+      if (pp->thread_id > 0 && pp->thread_id <= 20)
+        used_ids[pp->thread_id] = 1;
+    }
+  }
+
+  int new_tid = -1;
+  for(int j = 1; j <= 20; j++) {
+    if(used_ids[j] == 0) {
+      new_tid = j;
+      break;
+    }
+  }
+
+  if (new_tid == -1) { 
+    np->pagetable = 0;
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
+  np->thread_id = new_tid;
+
+  uint64 trapframe_va = TRAPFRAME - (np->thread_id * PGSIZE);
+  
+  if(mappages(np->pagetable, trapframe_va, PGSIZE,
+              (uint64)(np->trapframe), PTE_R | PTE_W) < 0){
+    np->pagetable = 0;
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
+
+  np->parent = p;
 
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
