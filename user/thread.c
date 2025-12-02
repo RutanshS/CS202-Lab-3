@@ -17,3 +17,26 @@ void lock_release(struct lock_t* lock){
     __sync_lock_release(&lock->locked);
 }
 
+int 
+thread_create(void *(start_routine)(void*), void *arg)
+{
+    void* stack = malloc(PGSIZE);
+    if(stack==0){
+        return -1;
+    }
+
+    void* stack_top = stack + PGSIZE;
+    int pid = clone(stack_top);
+
+    if(pid < 0){
+        free(stack);
+        return -1;
+    }
+
+    if(pid == 0){
+        start_routine(arg);
+        exit(0);
+    }else{
+        return 0;
+    }
+}
